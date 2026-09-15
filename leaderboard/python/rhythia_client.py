@@ -91,14 +91,22 @@ class RhythiaClient:
             names.append(doc["fields"].get("name", {}).get("stringValue", doc["name"].rsplit("/", 1)[-1]))
         return sorted(names)
 
-    def register_player(self, name):
-        """Idempotently register a player (already exists = fine)."""
+    def register_player(self, name, phone="", college="", semester=""):
+        """Idempotently register a player with optional metadata."""
         name = name.strip()[:30]
         if not name:
             raise ValueError("name must not be empty")
         base, h = self._firestore()
         doc_id = urllib.parse.quote(name, safe="")
-        payload = {"fields": {"name": {"stringValue": name}, "createdAt": {"stringValue": str(int(time.time()))}}}
+        payload = {
+            "fields": {
+                "name":     {"stringValue": name},
+                "phone":    {"stringValue": phone[:15]},
+                "college":  {"stringValue": college[:50]},
+                "semester": {"stringValue": semester[:10]},
+                "createdAt":{"stringValue": str(int(time.time()))},
+            }
+        }
         url = f"{base}/players?documentId={doc_id}&allowMissing=true"
         try:
             self._patch(url, h, payload)   # create-if-missing

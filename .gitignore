@@ -1,1 +1,9 @@
 leaderboard/python/__pycache__/
+launcher/active_player.json
+launcher/player_cache.json
+games/*/Build/
+games/*/Library/
+games/*/Temp/
+games/*/Obj/
+games/*/Logs/
+games/*/UserSettings/

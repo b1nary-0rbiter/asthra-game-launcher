@@ -76,6 +76,11 @@
     <input type="text" id="playerNew" placeholder="or type a NEW name to register">
     <button id="btnReg" onclick="savePlayer()">Register / Select</button>
   </div>
+  <div class="row" style="margin-top:10px">
+    <input type="text" id="fPhone" placeholder="Phone (for new player)">
+    <input type="text" id="fCollege" placeholder="College">
+    <input type="text" id="fSemester" placeholder="Semester" style="min-width:110px;flex:0">
+  </div>
   <div class="error" id="err"></div>
 </div>
 
@@ -102,6 +107,7 @@ const db = firebase.firestore();
 const sel = document.getElementById('playerSel');
 const err = document.getElementById('err');
 let activePlayer = localStorage.getItem('rhythia_player') || '';
+let lookup = new Map();   // player name → full doc (for college/semester display)
 
 function setStatus(msg, ok) {
   const el = document.getElementById('status');
@@ -116,20 +122,27 @@ async function loadPlayers() {
   setStatus('loading players…');
   try {
     const snap = await db.collection('players').orderBy('name').get();
-    const names = snap.docs.map(d => d.data().name || d.id);
+    const list = [];
+    lookup = new Map();
     sel.innerHTML = '';
-    for (const n of names) {
+    for (const d of snap.docs) {
+      const f = d.data();
+      const name = f.name || d.id;
+      const college = f.college || '';
+      lookup.set(name, f);
+      list.push({ name, college });
       const opt = document.createElement('option');
-      opt.value = n; opt.textContent = n;
+      opt.value = name;
+      opt.textContent = college ? `${name}  (${college})` : name;
       sel.appendChild(opt);
     }
-    if (activePlayer && names.includes(activePlayer)) {
+    if (activePlayer && list.some(p => p.name === activePlayer)) {
       sel.value = activePlayer;
     }
     document.getElementById('playerNew').placeholder =
-      names.length ? "or type a NEW name to register"
-                   : "no players yet — type your name";
-    setStatus((names.length ? names.length + ' players' : 'no players yet') +
+      list.length ? "or type a NEW name to register"
+                  : "no players yet — type your name";
+    setStatus((list.length ? list.length + ' players' : 'no players yet') +
               ' · scores: ' + await countScores(), true);
   } catch (e) {
     setStatus('error loading', false);
@@ -143,8 +156,9 @@ async function savePlayer() {
   const name = newName || selName;
   if (!name) return showErr('Type a name or pick one from the list.');
   try {
+    const meta = collectPlayerMeta();
     await db.collection('players').doc(name).set(
-      { name: name, createdAt: Date.now() }, { merge: true }
+      Object.assign({ name: name, createdAt: Date.now() }, meta), { merge: true }
     );
     localStorage.setItem('rhythia_player', name);
     activePlayer = name;
@@ -154,6 +168,17 @@ async function savePlayer() {
   } catch (e) {
     showErr(e.message);
   }
+}
+
+function collectPlayerMeta() {
+  const meta = {};
+  const phone = document.getElementById('fPhone').value.trim();
+  const college = document.getElementById('fCollege').value.trim();
+  const sem = document.getElementById('fSemester').value.trim();
+  if (phone) meta.phone = phone;
+  if (college) meta.college = college;
+  if (sem) meta.semester = sem;
+  return meta;
 }
 
 /* ---------- ranking ---------- */
@@ -189,9 +214,14 @@ async function loadBoard() {
     rows.forEach(([player, total], i) => {
       const tr = document.createElement('tr');
       if (i === 0) tr.className = 'top';
+      const meta = lookup.get(player) || {};
+      const college = meta.college || '';
+      const sem = meta.semester ? ' S' + meta.semester : '';
+      const nameCell = player + (college ? ' <span style="color:var(--muted)">· ' + college + sem + '</span>' : '') +
+                       (player === activePlayer ? ' <span style="color:var(--accent2)">▶</span>' : '');
       tr.innerHTML =
         '<td class="rank">' + (i + 1) + '</td>' +
-        '<td>' + player + (player === activePlayer ? ' <span style="color:var(--accent2)">▶</span>' : '') + '</td>' +
+        '<td>' + nameCell + '</td>' +
         '<td class="num">' + total.toLocaleString() + '</td>';
       tbody.appendChild(tr);
     });

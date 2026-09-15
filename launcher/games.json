@@ -1,0 +1,18 @@
+{
+  "games": [
+    {
+      "id": "zombie-gun",
+      "name": "Zombie Gun",
+      "exe": "../games/zombie-gun/Build/zombie-gun.exe",
+      "color": "#ff4d6d"
+    },
+    {
+      "id": "snake",
+      "name": "Snake",
+      "exe": "../games/snake/Build/snake.exe",
+      "color": "#00e5a0"
+    }
+  ],
+  "leaderboard_url": "../leaderboard/web/index.html",
+  "player_file": "active_player.json"
+}
