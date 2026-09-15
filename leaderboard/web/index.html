@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RHYTHIA Leaderboard</title>
+<style>
+  :root {
+    --bg: #0a0c10; --surface: #141820; --border: #1e2630;
+    --accent: #00e5a0; --accent2: #0090ff; --warn: #ff6b35;
+    --text: #e0e6ee; --muted: #4a5468; --font: 'Courier New', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: var(--font); min-height: 100vh; padding: 20px 6vw 60px;
+  }
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 24px; padding-bottom: 14px; border-bottom: 1px solid var(--border);
+  }
+  h1 { font-size: 15px; letter-spacing: 0.1em; color: var(--muted); font-weight: normal; }
+  h1 span { display: block; font-size: 26px; color: var(--accent); letter-spacing: 0; font-weight: bold; }
+  .status { font-size: 11px; color: var(--muted); }
+  .status.ok { color: var(--accent); }
+
+  .panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px; margin-bottom: 22px;
+  }
+  .panel-label {
+    font-size: 10px; color: var(--muted); letter-spacing: 0.1em;
+    margin-bottom: 10px; text-transform: uppercase;
+  }
+
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  select, input[type=text] {
+    background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 9px 12px; font-family: var(--font); font-size: 14px;
+    flex: 1; min-width: 200px;
+  }
+  select { max-height: 200px; }
+  button {
+    padding: 10px 16px; background: var(--accent); color: #071009;
+    border: none; border-radius: 6px; font-family: var(--font);
+    font-size: 12px; font-weight: bold; cursor: pointer; letter-spacing: 0.03em;
+  }
+  button:hover { opacity: 0.9; }
+  button.secondary { background: var(--border); color: var(--text); }
+
+  .table { width: 100%; border-collapse: collapse; }
+  .table th {
+    text-align: left; font-size: 10px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.08em; padding: 6px 10px; border-bottom: 1px solid var(--border);
+  }
+  .table td { padding: 9px 10px; font-size: 14px; border-bottom: 1px solid #161c26; }
+  .table tr.top td { color: var(--accent); font-weight: bold; }
+  .table .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .rank { width: 34px; color: var(--muted); }
+  .empty { color: var(--muted); font-size: 12px; padding: 14px 10px; }
+  .error { color: var(--warn); font-size: 12px; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>RHYTHIA<span>LEADERBOARD</span></h1>
+  <div class="status" id="status">loading…</div>
+</header>
+
+<!-- Player picker -->
+<div class="panel">
+  <div class="panel-label">Who's playing</div>
+  <div class="row">
+    <select id="playerSel" title="Registered players"></select>
+    <input type="text" id="playerNew" placeholder="or type a NEW name to register">
+    <button id="btnReg" onclick="savePlayer()">Register / Select</button>
+  </div>
+  <div class="error" id="err"></div>
+</div>
+
+<!-- Ranking -->
+<div class="panel">
+  <div class="panel-label">Combined ranking — sum of best score per game</div>
+  <table class="table">
+    <thead>
+      <tr><th></th><th>Player</th><th>Total</th></tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <div class="empty" id="empty">No scores yet.</div>
+</div>
+
+<!-- Firebase JS SDK (CDN) + config -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+const sel = document.getElementById('playerSel');
+const err = document.getElementById('err');
+let activePlayer = localStorage.getItem('rhythia_player') || '';
+
+function setStatus(msg, ok) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = 'status' + (ok ? ' ok' : '');
+}
+
+function showErr(msg) { err.textContent = msg || ''; }
+
+/* ---------- player picker ---------- */
+async function loadPlayers() {
+  setStatus('loading players…');
+  try {
+    const snap = await db.collection('players').orderBy('name').get();
+    const names = snap.docs.map(d => d.data().name || d.id);
+    sel.innerHTML = '';
+    for (const n of names) {
+      const opt = document.createElement('option');
+      opt.value = n; opt.textContent = n;
+      sel.appendChild(opt);
+    }
+    if (activePlayer && names.includes(activePlayer)) {
+      sel.value = activePlayer;
+    }
+    document.getElementById('playerNew').placeholder =
+      names.length ? "or type a NEW name to register"
+                   : "no players yet — type your name";
+    setStatus((names.length ? names.length + ' players' : 'no players yet') +
+              ' · scores: ' + await countScores(), true);
+  } catch (e) {
+    setStatus('error loading', false);
+    showErr(e.message);
+  }
+}
+
+async function savePlayer() {
+  const selName = sel.value;
+  const newName = document.getElementById('playerNew').value.trim();
+  const name = newName || selName;
+  if (!name) return showErr('Type a name or pick one from the list.');
+  try {
+    await db.collection('players').doc(name).set(
+      { name: name, createdAt: Date.now() }, { merge: true }
+    );
+    localStorage.setItem('rhythia_player', name);
+    activePlayer = name;
+    showErr('');
+    setStatus('playing as: ' + name, true);
+    loadPlayers();
+  } catch (e) {
+    showErr(e.message);
+  }
+}
+
+/* ---------- ranking ---------- */
+async function countScores() {
+  try { return (await db.collection('scores').get()).size; } catch (e) { return 0; }
+}
+
+async function loadBoard() {
+  const tbody = document.getElementById('tbody');
+  const empty = document.getElementById('empty');
+  setStatus('loading board…');
+  try {
+    const snap = await db.collection('scores').get();
+    // best score per (player, game)
+    const best = new Map(); // key "p::g" -> score
+    for (const d of snap.docs) {
+      const f = d.data();
+      if (!f.player || !f.game) continue;
+      const key = f.player + '::' + f.game;
+      const s = Number(f.score) || 0;
+      if (!best.has(key) || s > best.get(key)) best.set(key, s);
+    }
+    // sum per player
+    const totals = new Map();
+    for (const [key, score] of best) {
+      const player = key.split('::')[0];
+      totals.set(player, (totals.get(player) || 0) + score);
+    }
+    const rows = [...totals.entries()].sort((a, b) => b[1] - a[1]);
+
+    tbody.innerHTML = '';
+    empty.style.display = rows.length ? 'none' : 'block';
+    rows.forEach(([player, total], i) => {
+      const tr = document.createElement('tr');
+      if (i === 0) tr.className = 'top';
+      tr.innerHTML =
+        '<td class="rank">' + (i + 1) + '</td>' +
+        '<td>' + player + (player === activePlayer ? ' <span style="color:var(--accent2)">▶</span>' : '') + '</td>' +
+        '<td class="num">' + total.toLocaleString() + '</td>';
+      tbody.appendChild(tr);
+    });
+    setStatus((rows.length ? rows.length : 'no') + ' players ranked' +
+              (activePlayer ? ' · playing as ' + activePlayer : ''), true);
+  } catch (e) {
+    setStatus('board error', false);
+    showErr(e.message);
+  }
+}
+
+loadPlayers();
+loadBoard();
+setInterval(loadBoard, 10000);   // auto-refresh
+</script>
+</body>
+</html>

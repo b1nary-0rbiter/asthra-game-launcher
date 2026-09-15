@@ -1,0 +1,12 @@
+// Paste your Firebase web-app config here (console → Project settings → Your apps).
+// Only apiKey + projectId are strictly needed for the REST clients.
+// This file is intentionally NOT committed (see .gitignore); create it from
+// the template below.
+const firebaseConfig = {
+  apiKey: "PASTE_YOUR_apiKey",
+  authDomain: "PASTE.firebaseapp.com",
+  projectId: "PASTE_your_project_id",
+  storageBucket: "",
+  messagingSenderId: "",
+  appId: ""
+};

@@ -1,0 +1,4 @@
+# Firebase credentials — never commit
+leaderboard/firebase-config.json
+leaderboard/web/firebase-config.js
+*.firebase
