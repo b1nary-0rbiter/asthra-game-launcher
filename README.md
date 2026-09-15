@@ -6,6 +6,7 @@ A collection of small unity games developed for the technical showcase of asthra
 | Game | Made by | Unity version | Folder |
 |------|---------|----------------|--------|
 | Snake | @username | 2022.3 | `games/snake` |
+| Nova Drift | [@Dintodj](https://github.com/Dintodj) | TBD | `games/nova-drift` |
 
 ## Folder layout
 

@@ -11,6 +11,12 @@
       "name": "Snake",
       "exe": "../games/snake/Build/snake.exe",
       "color": "#00e5a0"
+    },
+    {
+      "id": "nova-drift",
+      "name": "Nova Drift",
+      "exe": "../games/nova-drift/Build/nova-drift.exe",
+      "color": "#6c5ce7"
     }
   ],
   "leaderboard_url": "../leaderboard/web/index.html",
